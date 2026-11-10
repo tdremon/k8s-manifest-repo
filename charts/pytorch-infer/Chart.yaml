@@ -1,0 +1,15 @@
+# chart 의 "신분증". 어떤 chart 를 보든 이 파일을 가장 먼저 읽는다.
+apiVersion: v2                 # Helm 3/4 chart 형식(v2). v1 은 Helm 2 시절 형식
+name: pytorch-infer            # chart 이름. 리소스 이름의 기본값과 container 이름에도 쓰인다(templates/_helpers.tpl 참고)
+description: PyTorch 추론 서버(FastAPI) 학습용 chart. 기존 k8s/manifests 를 chart 로 옮긴 것이다
+type: application              # application(배포 가능) / library(다른 chart 가 가져다 쓰는 함수 모음)
+
+# version  : chart 자체의 버전. 템플릿이나 values 구조를 바꾸면 올린다 (SemVer). 0.2.0: Redis(redis.enabled 토글) 추가
+# appVersion: 이 chart 가 배포하는 "앱"의 버전. 정보용이며, 이미지 태그가 비어 있으면 기본값으로 쓰인다(templates/deployment.yaml)
+#             이 프로젝트는 이미지 태그를 git SHA 로 쓴다(DoD 결정 #12)
+version: 0.2.0
+appVersion: "sha-c0a7be8"
+
+# 이 chart 를 설치할 수 있는 K8S 버전 범위. 범위 밖이면 install 이 거부된다.
+# (policy/v1 PDB, autoscaling/v2 HPA 를 쓰므로 충분히 새로운 버전을 요구한다. "-0" 은 1.30.0-eks-xxx 같은 접미사를 허용하기 위한 관례)
+kubeVersion: ">=1.27.0-0"

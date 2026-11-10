@@ -1,0 +1,31 @@
+{{- /*
+  ServiceMonitor 는 chart 가 만드는 K8S 기본 리소스가 아니라 Prometheus Operator 의 CRD 다.
+  CRD 가 없는 클러스터에서 만들면 "no matches for kind ServiceMonitor" 로 install 이 실패한다.
+  그래서 (1) 토글이 켜져 있고 (2) 클러스터에 그 API 가 있을 때만 렌더링한다. (.Capabilities 는 helm install/upgrade 때 클러스터에 물어본 값)
+  함정: `helm template` 은 클러스터에 연결하지 않으므로 기본적으로 이 API 가 "없다"고 보고 이 리소스를 만들지 않는다.
+        렌더링을 확인하려면 `helm template ... --api-versions monitoring.coreos.com/v1` 을 붙인다. (NOTES.txt 에 경고도 둔다)
+*/ -}}
+{{- if and .Values.serviceMonitor.enabled (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1") }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "pytorch-infer.fullname" . }}
+  labels:
+    {{- include "pytorch-infer.labels" . | nindent 4 }}
+    {{- with .Values.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "pytorch-infer.selectorLabels" . | nindent 6 }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}      # 기존 yaml 은 `default` 를 박아 두었다. chart 는 설치된 네임스페이스를 따라가야 한다
+  endpoints:
+    - port: http                      # Service 의 "포트 이름"(숫자 아님)
+      path: {{ .Values.serviceMonitor.path }}
+      {{- with .Values.serviceMonitor.interval }}
+      interval: {{ . }}
+      {{- end }}
+{{- end }}

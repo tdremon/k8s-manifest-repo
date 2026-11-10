@@ -1,0 +1,29 @@
+# Argo CD Application: 이 repo 의 chart 를 kind 클러스터의 gitops-app 네임스페이스에 배포한다.
+#
+# 등록(한 번만. Argo CD 는 이 파일을 자동으로 읽어가지 않는다):
+#   kubectl apply -f argocd/pytorch-infer-app.yaml
+# 사전 조건: gitops-app 네임스페이스와 그 안의 ghcr-pull Secret (Secret 은 Git 에 없다. 절차는 monorepo 의 k8s/argocd/argocd-guide.md 4-2)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pytorch-infer          # Application 이름 = helm release 이름. chart 의 fullname 이 이 이름에서 만들어진다(리소스 이름 pytorch-infer)
+  namespace: argocd            # Application 자체는 항상 argocd 네임스페이스에 만든다(배포 대상 네임스페이스가 아니다)
+  # finalizers 는 일부러 두지 않는다. Application 을 지워도 배포된 리소스는 남는다(안전한 쪽).
+  # 지울 때 파드까지 함께 지우려면 resources-finalizer.argocd.argoproj.io 를 추가한다.
+spec:
+  project: default             # AppProject = 배포를 허용하는 repo/클러스터/네임스페이스의 범위. default 는 제한이 없다
+  source:
+    repoURL: https://github.com/tdremon/k8s-manifest-repo.git   # public 이라 Argo CD 에 읽기 자격증명을 등록하지 않아도 된다
+    targetRevision: main       # 추적할 branch / tag / 커밋
+    path: charts/pytorch-infer # Chart.yaml 이 있는 폴더. Argo CD 가 helm chart 로 인식한다
+    helm:
+      valueFiles:
+        - values-kind.yaml     # path 기준 상대 경로. chart 의 values.yaml 은 자동으로 쓰이고 이 파일이 덮어쓴다
+  destination:
+    server: https://kubernetes.default.svc     # Argo CD 가 설치된 이 클러스터(in-cluster)
+    namespace: gitops-app
+  # syncPolicy 가 없으면 수동 sync 다(OutOfSync 로 표시만 하고 사람이 sync 해야 배포된다). 자동 sync 는 첫 배포를 확인한 뒤 추가한다:
+  #   syncPolicy:
+  #     automated:
+  #       prune: true      # Git 에서 지운 리소스를 클러스터에서도 지운다
+  #       selfHeal: true   # 클러스터를 직접 수정하면 Git 상태로 되돌린다

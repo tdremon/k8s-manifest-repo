@@ -1,0 +1,37 @@
+{{- /*
+  `helm test <release>` 가 실행하는 파드. "hook" 은 release 의 수명주기 특정 시점에 실행되는 리소스다.
+  이 파드는 평소에는 만들어지지 않고(annotation 이 test), helm test 를 할 때만 만들어져 서비스의 /readyz 를 호출한다.
+  성공(종료 코드 0)하면 test 통과. 이 네임스페이스가 PSA restricted 일 수 있으므로 securityContext 를 갖춘다.
+*/ -}}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "pytorch-infer.fullname" . }}-test
+  labels:
+    {{- include "pytorch-infer.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 100                    # curlimages/curl 의 curl_user (숫자로 적어야 non-root 검증이 된다)
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: curl
+      image: curlimages/curl:8.10.1
+      command: ["curl", "-sf", "--max-time", "10", "http://{{ include "pytorch-infer.fullname" . }}:{{ .Values.service.port }}/readyz"]
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi

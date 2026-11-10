@@ -1,0 +1,110 @@
+{{- /*
+  Deployment. 기존 k8s/manifests/pytorch-infer-deployment.yaml 을 values 로 일반화한 것이다.
+  읽는 순서: metadata -> spec.replicas(조건) -> selector -> template.metadata(checksum) -> template.spec -> containers
+  "무엇이 values 이고 무엇이 고정인가"는 values.yaml 의 머리 주석과 chart 가이드 4장에 정리했다.
+*/ -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pytorch-infer.fullname" . }}
+  labels:
+    {{- include "pytorch-infer.labels" . | nindent 4 }}
+spec:
+  {{- /* HPA 를 쓰면 replicas 를 적지 않는다(적으면 upgrade 때마다 HPA 가 정한 수가 덮어써진다) */}}
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  selector:
+    matchLabels:
+      {{- include "pytorch-infer.selectorLabels" . | nindent 6 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: {{ .Values.strategy.maxUnavailable }}
+      maxSurge: {{ .Values.strategy.maxSurge }}
+  template:
+    metadata:
+      annotations:
+        {{- /*
+          ConfigMap 의 "렌더링 결과"의 해시를 파드 annotation 으로 넣는다.
+          ConfigMap 만 바뀌면 파드 템플릿이 그대로라 롤아웃이 안 일어나고, 실행 중인 파드는 옛 값을 계속 쓴다.
+          내용이 바뀌면 이 해시가 바뀌어 파드 템플릿이 달라지고, helm upgrade 만으로 롤링 업데이트가 일어난다.
+          (이 줄이 없으면 helm upgrade 후에 kubectl rollout restart 를 따로 해야 한다)
+        */}}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "pytorch-infer.labels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "pytorch-infer.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      {{- /* Service 마다 <이름>_SERVICE_HOST 같은 환경변수를 주입하는 동작을 끈다(앱 설정과 충돌했던 이슈). values 로 둘 이유가 없어 고정 */}}
+      enableServiceLinks: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            {{- /* 포트 이름 http 는 Service 의 targetPort, ServiceMonitor 의 port, probe 가 이름으로 참조한다. 바꾸면 모두 어긋나므로 고정 */}}
+            - name: http
+              containerPort: {{ .Values.containerPort }}
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: {{ .Values.lifecycle.preStopSleepSeconds }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          env:
+            {{- /* Downward API: 앱(server.py)이 이 이름으로 읽는다. chart 와 앱 사이의 약속이라 values 로 빼지 않는다 */}}
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          envFrom:
+            - configMapRef:
+                name: {{ include "pytorch-infer.configMapName" . }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          startupProbe:
+            {{- toYaml .Values.startupProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ .Values.tmpVolume.sizeLimit }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

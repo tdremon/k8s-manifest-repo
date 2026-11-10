@@ -1,0 +1,14 @@
+# kind 실습 환경에서 기본값(values.yaml)과 "다른 것만" 적는 파일.
+# 사용: helm install pytorch-infer k8s/helm/practice/pytorch-infer -n helm-app -f k8s/helm/practice/pytorch-infer/values-kind.yaml
+#
+# 원칙: 환경 파일에는 차이만 둔다. 전부 복사해 두면 기본값이 바뀔 때 어느 쪽이 맞는지 알 수 없게 된다.
+# (EKS 로 가면 values-eks.yaml 을 같은 방식으로 만든다: ingress className 이 alb, 이미지 레지스트리, 리소스 등)
+
+# private GHCR 이미지를 받기 위한 pull Secret 이름. Secret 은 이 네임스페이스에 따로 만들어야 한다(chart 가이드 H0).
+imagePullSecrets:
+  - name: ghcr-pull
+
+# kind 에는 kube-prometheus-stack 이 설치되어 있다. 켜면 ServiceMonitor 가 만들어져 Prometheus 가 수집한다.
+# 같은 앱이 default 에도 떠 있으므로 대시보드에서 두 네임스페이스가 섞이지 않게 주의한다. 처음에는 꺼 둔다.
+serviceMonitor:
+  enabled: false

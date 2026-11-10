@@ -1,0 +1,25 @@
+{{- /*
+  [직접 작성할 부분 — H2]  지금은 값이 템플릿에 "박혀" 있다(H1 단계: 기존 yaml 을 그대로 옮긴 상태).
+  할 일: 아래 data 의 값을 values.yaml 의 `config:` 맵으로 빼고, 이 파일은 range 로 렌더링하도록 고친다.
+         (숫자처럼 보이는 값은 반드시 문자열이어야 하므로 quote 가 필요하다. 힌트와 답안은 chart 가이드 H2)
+  주의: deployment.yaml 의 checksum/config 가 이 파일의 렌더링 결과를 읽는다. 파일 이름과 위치를 바꾸지 않는다.
+*/ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pytorch-infer.configMapName" . }}
+  labels:
+    {{- include "pytorch-infer.labels" . | nindent 4 }}
+data:
+  {{- /*
+    redis.enabled=true 이면 REDIS_HOST 를 chart 안의 Redis Service 이름으로 정한다(사용자가 config.REDIS_HOST 를 줘도 이 값이 이긴다).
+    false 이면 config.REDIS_HOST 를 그대로 쓴다(""=캐시 끔, 또는 chart 밖 Redis 주소).
+    .Values 는 직접 고치지 않고 복사본($config)에 덮어쓴다. range 는 키 이름순이라 렌더링 순서는 그대로다.
+  */ -}}
+  {{- $config := deepCopy .Values.config }}
+  {{- if .Values.redis.enabled }}
+  {{- $_ := set $config "REDIS_HOST" (include "pytorch-infer.redis.fullname" .) }}
+  {{- end }}
+  {{- range $key, $value := $config }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}

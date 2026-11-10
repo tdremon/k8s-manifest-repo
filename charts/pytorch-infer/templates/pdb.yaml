@@ -1,0 +1,19 @@
+{{- /*
+  [직접 작성할 부분 — H3]  지금은 항상 만들어지고 값도 박혀 있다.
+  할 일: values.yaml 에 `pdb:` 블록(enabled, maxUnavailable)을 만들고, 이 파일 전체를 `if .Values.pdb.enabled` 로 감싸 값을 values 로 바꾼다.
+         (힌트와 답안은 chart 가이드 H3)
+  배경: k8s/manifests/pytorch-infer-pdb.yaml 주석과 PD1 카드. maxUnavailable 은 "개수 또는 %" 라서 replicas 가 변해도(HPA) 의미가 유지된다.
+*/ -}}
+{{- if .Values.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "pytorch-infer.fullname" . }}
+  labels:
+    {{- include "pytorch-infer.labels" . | nindent 4 }}
+spec:
+  maxUnavailable: {{ .Values.pdb.maxUnavailable }}
+  selector:
+    matchLabels:
+      {{- include "pytorch-infer.selectorLabels" . | nindent 6 }}
+{{- end }}

@@ -1,0 +1,28 @@
+{{- /* install/upgrade 직후 화면에 출력되는 안내문. `helm get notes <release>` 로 다시 볼 수 있다. 리소스가 아니다 */ -}}
+{{ .Chart.Name }} {{ .Chart.Version }} (app {{ .Chart.AppVersion }}) 을(를) 네임스페이스 {{ .Release.Namespace }} 에 release "{{ .Release.Name }}" 로 설치했다.
+
+이미지: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+{{- if .Values.autoscaling.enabled }}
+파드 수: HPA 가 {{ .Values.autoscaling.minReplicas }}~{{ .Values.autoscaling.maxReplicas }} 사이에서 조절한다 (replicaCount 는 무시됨)
+{{- else }}
+파드 수: {{ .Values.replicaCount }}
+{{- end }}
+
+확인:
+  kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+클러스터 안에서 호출:
+  kubectl run curl --rm -i --restart=Never -n {{ .Release.Namespace }} --image=curlimages/curl:8.10.1 --command -- curl -s http://{{ include "pytorch-infer.fullname" . }}:{{ .Values.service.port }}/info
+{{- if .Values.redis.enabled }}
+캐시: Redis {{ .Values.redis.image.tag }} 를 함께 설치했다. 앱의 REDIS_HOST = {{ include "pytorch-infer.redis.fullname" . }}
+  kubectl exec -n {{ .Release.Namespace }} deploy/{{ include "pytorch-infer.redis.fullname" . }} -- redis-cli dbsize
+{{- else if .Values.config.REDIS_HOST }}
+캐시: chart 밖의 Redis({{ .Values.config.REDIS_HOST }})를 쓴다.
+{{- else }}
+캐시: 꺼져 있다(REDIS_HOST 가 비어 있음). 켜려면 --set redis.enabled=true
+{{- end }}
+{{- if and .Values.serviceMonitor.enabled (not (.Capabilities.APIVersions.Has "monitoring.coreos.com/v1")) }}
+
+[경고] serviceMonitor.enabled=true 이지만 이 클러스터에 monitoring.coreos.com/v1 API(Prometheus Operator CRD)가 없어 ServiceMonitor 를 만들지 않았다.
+{{- end }}
