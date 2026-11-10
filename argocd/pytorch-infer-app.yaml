@@ -23,7 +23,7 @@ spec:
     server: https://kubernetes.default.svc     # Argo CD 가 설치된 이 클러스터(in-cluster)
     namespace: gitops-app
   # syncPolicy 가 없으면 수동 sync 다(OutOfSync 로 표시만 하고 사람이 sync 해야 배포된다). 자동 sync 는 첫 배포를 확인한 뒤 추가한다:
-  #   syncPolicy:
-  #     automated:
-  #       prune: true      # Git 에서 지운 리소스를 클러스터에서도 지운다
-  #       selfHeal: true   # 클러스터를 직접 수정하면 Git 상태로 되돌린다
+  syncPolicy:
+    automated:
+      prune: true      # Git 에서 지운 리소스를 클러스터에서도 지운다
+      selfHeal: true   # 클러스터를 직접 수정하면 Git 상태로 되돌린다
