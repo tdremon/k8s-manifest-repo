@@ -20,4 +20,4 @@ ingress:
 # 이미지 태그. GitHub Actions(deploy-tag job)가 이 줄을 `sha-<커밋 7자리>` 로 바꿔 커밋한다 -> Argo CD 가 감지해서 배포한다.
 # 줄 형식(2칸 들여쓰기 + `tag: "..."`)을 바꾸면 CI 의 sed 가 실패한다. values.yaml 의 tag 는 기본값이고 이 값이 덮어쓴다.
 image:
-  tag: "sha-ffb1684"
+  tag: "sha-fa7e532"
