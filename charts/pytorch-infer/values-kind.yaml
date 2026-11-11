@@ -12,3 +12,7 @@ imagePullSecrets:
 # 같은 앱이 default 에도 떠 있으므로 대시보드에서 두 네임스페이스가 섞이지 않게 주의한다. 처음에는 꺼 둔다.
 serviceMonitor:
   enabled: false
+
+ingress:
+  enabled: true
+  host: gitops.local
